@@ -120,6 +120,16 @@ const useResources = (
     { loading: loadingCreateMessageBroker, error: errorCreateMessageBroker },
   ] = useMutation<TCreateMessageBroker>(CREATE_MESSAGE_BROKER);
 
+  const generateNewMessageBrokerName = (
+    data: models.ResourceCreateInput,
+    messageBrokers: models.Resource[]
+  ) => {
+    const counter = messageBrokers[0]?.name?.replace(/\D/g, "");
+    const intCounter = parseInt(counter) + 1;
+    if (intCounter < 0 || typeof intCounter !== "number") return;
+    data.name = `My message broker-${intCounter}`;
+  };
+
   const createMessageBroker = (
     data: models.ResourceCreateInput,
     eventName: AnalyticsEventNames
@@ -127,14 +137,29 @@ const useResources = (
     trackEvent({
       eventName: eventName,
     });
-    createBroker({ variables: { data: data } }).then((result) => {
-      result.data?.createMessageBroker.id &&
-        addBlock(result.data.createMessageBroker.id);
-      result.data?.createMessageBroker.id &&
-        refetch().then(() => {
-          resourceRedirect(result.data?.createMessageBroker.id as string);
-        });
-    });
+    const messageBrokers = resources.filter(
+      (resource) => resource.resourceType === "MessageBroker"
+    );
+    const isContains = messageBrokers.some(
+      (messageBroker) => messageBroker.name === "My message broker-9"
+    );
+    if (isContains) {
+      //shallow copy of data
+      generateNewMessageBrokerName(data, messageBrokers);
+    }
+    createBroker({ variables: { data: data } })
+      .then((result) => {
+        console.log("result ", result);
+        result.data?.createMessageBroker.id &&
+          addBlock(result.data.createMessageBroker.id);
+        result.data?.createMessageBroker.id &&
+          refetch().then(() => {
+            resourceRedirect(result.data?.createMessageBroker.id as string);
+          });
+      })
+      .catch((ex) =>
+        console.log(`Error while creating Message Broker - ${ex}`)
+      );
   };
 
   const createResourcePlugins = useCallback((resourceId: string) => {
@@ -172,7 +197,6 @@ const useResources = (
 
   useEffect(() => {
     if (resourceMatch) return;
-
     currentResource && setCurrentResource(undefined);
     projectConfigurationResource &&
       setGitRepositoryFullName(
